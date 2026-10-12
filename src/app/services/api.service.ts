@@ -242,6 +242,18 @@ export class ApiService {
     this.showToast('You have signed out.');
   }
 
+  updateProfile(userId: number, payload: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    stage?: string;
+    dueDate?: string;
+  }): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/users/${userId}`, payload).pipe(
+      catchError(() => of({ success: false, message: 'Could not reach server. Please try again.' }))
+    );
+  }
+
   // --- Toast ---
 
   showToast(message: string) {

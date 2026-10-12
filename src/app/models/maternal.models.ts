@@ -92,6 +92,8 @@ export interface LeadProfile {
 
 export interface User {
   id: number;
+  firstName?: string;
+  lastName?: string;
   name: string;
   email?: string;
   phone?: string;
@@ -99,6 +101,7 @@ export interface User {
   stage?: PregnancyStage;
   dueDate?: string;
   role: string;
+  createdAt?: string;
 }
 
 export interface CartItem {

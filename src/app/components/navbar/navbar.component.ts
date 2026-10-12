@@ -1,17 +1,19 @@
 import { Component, inject } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { FirebaseAuthService } from '../../services/firebase-auth.service';
 import { CommonModule } from '@angular/common';
+import { FeatureDirective } from '../../directives/feature.directive';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, CommonModule],
+  imports: [RouterLink, RouterLinkActive, CommonModule, FeatureDirective],
   template: `
     <!-- Top Announcement Bar -->
     <div class="announcement-bar">
       <div class="container announcement-content">
-        <span>✨ <strong>Free OB-GYN Live Masterclass:</strong> 1st Trimester Nutrition & Safe Scans this Saturday!</span>
+        <span>✨ <strong>Free OB-GYN Live Masterclass:</strong> 1st Trimester Nutrition &amp; Safe Scans this Saturday!</span>
         <a routerLink="/doctors-live" class="announcement-link">Reserve Free Seat &rarr;</a>
       </div>
     </div>
@@ -21,9 +23,9 @@ import { CommonModule } from '@angular/common';
       <div class="container header-container">
         <!-- Brand Logo -->
         <a routerLink="/" class="brand-logo">
-          <span class="logo-leaf">🌿</span>
+          <img src="favicon.svg" alt="NartureBelle logo" class="logo-mark">
           <div class="logo-text">
-            <span class="brand-title">NartureBelle</span>
+            <span class="brand-title">NartureBelle<span class="trademark">™</span></span>
             <span class="brand-sub">Nurturing You, Nurturing Life</span>
           </div>
         </a>
@@ -31,8 +33,8 @@ import { CommonModule } from '@angular/common';
         <!-- Desktop Navigation Links -->
         <nav class="nav-links">
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-link">Home</a>
-          
-          <!-- Trimester / Stage Dropdown / Direct Links -->
+
+          <!-- Trimester Stage Pills -->
           <div class="stage-nav-group">
             <a routerLink="/products/month-3" routerLinkActive="active" class="nav-link stage-pill m3">
               <span class="pill-dot"></span>Month 3
@@ -48,10 +50,12 @@ import { CommonModule } from '@angular/common';
           <a routerLink="/checklists" routerLinkActive="active" class="nav-link highlight-link">
             <span>📋</span> Checkup Checklist
           </a>
-          <a routerLink="/services/nurse-companion" routerLinkActive="active" class="nav-link nurse-link">
+
+          <!-- Feature-toggled nav links -->
+          <a *appFeature="'nurseCompanion'" routerLink="/services/nurse-companion" routerLinkActive="active" class="nav-link nurse-link">
             <span>👩‍⚕️</span> Nurse Companion
           </a>
-          <a routerLink="/doctors-live" routerLinkActive="active" class="nav-link doctor-link">
+          <a *appFeature="'doctorLiveSessions'" routerLink="/doctors-live" routerLinkActive="active" class="nav-link doctor-link">
             <span>🔴</span> Doctor Live
           </a>
         </nav>
@@ -70,12 +74,25 @@ import { CommonModule } from '@angular/common';
             }
           </button>
 
-          <!-- Auth Status -->
+          <!-- Auth: signed-in user dropdown -->
           @if (api.currentUser(); as user) {
-            <div class="user-menu">
-              <span class="user-avatar">🌸</span>
-              <span class="user-name">{{ user.name.split(' ')[0] }}</span>
-              <button (click)="api.logout()" class="logout-btn" title="Sign Out">✕</button>
+            <div class="user-menu" [class.menu-open]="isUserMenuOpen">
+              <button class="user-pill" (click)="toggleUserMenu()" type="button">
+                <span class="user-avatar">🌸</span>
+                <span class="user-name">{{ getFirstName(user) }}</span>
+                <span class="chevron">{{ isUserMenuOpen ? '▲' : '▼' }}</span>
+              </button>
+              @if (isUserMenuOpen) {
+                <div class="user-dropdown">
+                  <a routerLink="/profile" class="dropdown-item" (click)="isUserMenuOpen = false">
+                    <span>👤</span> My Profile
+                  </a>
+                  <hr class="dropdown-divider">
+                  <button class="dropdown-item sign-out-item" (click)="signOut()">
+                    <span>🚪</span> Sign Out
+                  </button>
+                </div>
+              }
             </div>
           } @else {
             <a routerLink="/auth/login" class="btn btn-outline btn-sm login-btn">Sign In</a>
@@ -106,14 +123,27 @@ import { CommonModule } from '@angular/common';
           </div>
           <hr class="mobile-divider">
           <a routerLink="/checklists" (click)="isMobileOpen = false" class="mobile-nav-link">
-            📋 Prenatal Checkup Checklist & Labs
+            📋 Prenatal Checkup Checklist &amp; Labs
           </a>
-          <a routerLink="/services/nurse-companion" (click)="isMobileOpen = false" class="mobile-nav-link">
+          <a *appFeature="'nurseCompanion'" routerLink="/services/nurse-companion" (click)="isMobileOpen = false" class="mobile-nav-link">
             👩‍⚕️ Dedicated Nurse Care Companion
           </a>
-          <a routerLink="/doctors-live" (click)="isMobileOpen = false" class="mobile-nav-link">
+          <a *appFeature="'doctorLiveSessions'" routerLink="/doctors-live" (click)="isMobileOpen = false" class="mobile-nav-link">
             🔴 OB-GYN Live Webinars
           </a>
+          <hr class="mobile-divider">
+          @if (api.currentUser(); as user) {
+            <a routerLink="/profile" (click)="isMobileOpen = false" class="mobile-nav-link profile-link">
+              👤 My Profile ({{ getFirstName(user) }})
+            </a>
+            <button (click)="signOut()" class="btn btn-outline btn-sm mobile-action-btn">
+              🚪 Sign Out
+            </button>
+          } @else {
+            <a routerLink="/auth/login" (click)="isMobileOpen = false" class="btn btn-outline btn-sm mobile-action-btn">
+              Sign In
+            </a>
+          }
           <button (click)="openAssessment(); isMobileOpen = false" class="btn btn-primary btn-sm mobile-action-btn">
             ✨ Take 60s Pregnancy Checkup
           </button>
@@ -163,8 +193,12 @@ import { CommonModule } from '@angular/common';
       gap: 0.65rem;
       text-decoration: none;
     }
-    .logo-leaf {
-      font-size: 1.8rem;
+    .logo-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
     }
     .logo-text {
       display: flex;
@@ -177,6 +211,11 @@ import { CommonModule } from '@angular/common';
       color: var(--sage-900);
       line-height: 1.1;
       letter-spacing: -0.01em;
+    }
+    .trademark {
+      font-weight: 400;
+      font-size: 0.6em;
+      vertical-align: super;
     }
     .brand-sub {
       font-size: 0.68rem;
@@ -232,27 +271,16 @@ import { CommonModule } from '@angular/common';
       display: inline-block;
     }
 
-    .highlight-link {
-      color: var(--sage-800);
-      font-weight: 700;
-    }
-    .nurse-link {
-      color: var(--blush-800);
-      font-weight: 700;
-    }
-    .doctor-link {
-      color: #a32222;
-      font-weight: 700;
-    }
+    .highlight-link { color: var(--sage-800); font-weight: 700; }
+    .nurse-link { color: var(--blush-800); font-weight: 700; }
+    .doctor-link { color: #a32222; font-weight: 700; }
 
     .header-actions {
       display: flex;
       align-items: center;
       gap: 0.75rem;
     }
-    .assessment-btn {
-      white-space: nowrap;
-    }
+    .assessment-btn { white-space: nowrap; }
     .cart-btn {
       position: relative;
       background: var(--bg-surface);
@@ -271,9 +299,7 @@ import { CommonModule } from '@angular/common';
       border-color: var(--sage-700);
       transform: scale(1.05);
     }
-    .cart-icon {
-      font-size: 1.25rem;
-    }
+    .cart-icon { font-size: 1.25rem; }
     .cart-badge {
       position: absolute;
       top: -4px;
@@ -291,7 +317,11 @@ import { CommonModule } from '@angular/common';
       border: 2px solid #fff;
     }
 
+    /* User dropdown menu */
     .user-menu {
+      position: relative;
+    }
+    .user-pill {
       display: flex;
       align-items: center;
       gap: 0.4rem;
@@ -299,21 +329,65 @@ import { CommonModule } from '@angular/common';
       padding: 0.35rem 0.75rem;
       border-radius: var(--radius-full);
       border: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .user-avatar {
-      font-size: 1rem;
+    .user-pill:hover, .menu-open .user-pill {
+      border-color: var(--sage-700);
+      background: #e8f0ec;
     }
+    .user-avatar { font-size: 1rem; }
     .user-name {
       font-weight: 600;
       font-size: 0.85rem;
       color: var(--sage-900);
     }
-    .logout-btn {
+    .chevron {
+      font-size: 0.6rem;
       color: var(--text-muted);
-      font-size: 0.75rem;
-      margin-left: 0.25rem;
-      cursor: pointer;
+      margin-left: 0.1rem;
     }
+    .user-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: #fff;
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(27,51,39,0.12);
+      min-width: 180px;
+      z-index: 2000;
+      overflow: hidden;
+      animation: dropIn 0.15s ease;
+    }
+    @keyframes dropIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--sage-900);
+      cursor: pointer;
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .dropdown-item:hover { background: var(--sage-50); }
+    .dropdown-divider {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: 0;
+    }
+    .sign-out-item { color: #a32222; }
+    .sign-out-item:hover { background: #fdecea; }
 
     .mobile-toggle {
       display: none;
@@ -336,6 +410,7 @@ import { CommonModule } from '@angular/common';
       color: var(--sage-900);
       padding: 0.5rem 0;
     }
+    .profile-link { color: var(--blush-800); }
     .mobile-stages-title {
       font-size: 0.8rem;
       text-transform: uppercase;
@@ -357,46 +432,65 @@ import { CommonModule } from '@angular/common';
       display: flex;
       flex-direction: column;
     }
-    .mobile-stage-btn strong {
-      font-size: 0.9rem;
-      color: var(--sage-900);
-    }
-    .mobile-stage-btn span {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-    }
+    .mobile-stage-btn strong { font-size: 0.9rem; color: var(--sage-900); }
+    .mobile-stage-btn span { font-size: 0.7rem; color: var(--text-muted); }
     .mobile-divider {
       border: none;
       border-top: 1px solid var(--border-subtle);
       margin: 0.5rem 0;
     }
+    .mobile-action-btn { width: 100%; justify-content: center; }
 
     @media (max-width: 1024px) {
-      .nav-links {
-        display: none;
-      }
-      .mobile-toggle {
-        display: block;
-      }
-      .assessment-btn {
-        display: none;
-      }
+      .nav-links { display: none; }
+      .mobile-toggle { display: block; }
+      .assessment-btn { display: none; }
     }
   `]
 })
 export class NavbarComponent {
   api = inject(ApiService);
+  firebaseAuth = inject(FirebaseAuthService);
+  router = inject(Router);
+
   isMobileOpen = false;
+  isUserMenuOpen = false;
 
   toggleMobileMenu() {
     this.isMobileOpen = !this.isMobileOpen;
   }
 
+  toggleUserMenu() {
+    this.isUserMenuOpen = !this.isUserMenuOpen;
+  }
+
   openAssessment() {
     this.api.isAssessmentOpen.set(true);
+    this.isUserMenuOpen = false;
   }
 
   toggleCart() {
     this.api.isCartOpen.set(!this.api.isCartOpen());
+    this.isUserMenuOpen = false;
+  }
+
+  getFirstName(user: any): string {
+    if (user?.firstName) return user.firstName;
+    if (user?.name) return user.name.split(' ')[0];
+    return 'You';
+  }
+
+  signOut() {
+    this.isUserMenuOpen = false;
+    this.isMobileOpen = false;
+    this.firebaseAuth.logout()
+      .then(() => {
+        this.api.logout();
+        this.router.navigate(['/']);
+      })
+      .catch(() => {
+        this.api.logout();
+        this.router.navigate(['/']);
+      });
   }
 }
