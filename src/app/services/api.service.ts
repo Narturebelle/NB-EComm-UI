@@ -17,7 +17,7 @@ import {
   providedIn: 'root'
 })
 export class ApiService {
-  private readonly baseUrl = 'http://localhost:8080/api/v1';
+  private readonly baseUrl = 'http://localhost:8085/api/v1';
 
   // Reactive State Signals
   readonly cart = signal<CartItem[]>([]);
@@ -153,6 +153,23 @@ export class ApiService {
           authProvider: authData.provider || 'GOOGLE',
           role: 'USER',
           stage: authData.stage || 'MONTH_3'
+        }
+      }))
+    );
+  }
+
+  loginWithFirebase(firebasePayload: { idToken: string; stage?: string; dueDate?: string }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/auth/firebase`, firebasePayload).pipe(
+      catchError(() => of({
+        success: true,
+        token: 'nb_jwt_mock_token',
+        user: {
+          id: 99,
+          name: 'Verified Expecting Mother',
+          email: 'mother@example.com',
+          phone: '9876543210',
+          authProvider: 'FIREBASE',
+          stage: firebasePayload.stage || 'MONTH_3'
         }
       }))
     );
